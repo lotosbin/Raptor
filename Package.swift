@@ -7,7 +7,7 @@ let package = Package(
         .library(name: "Raptor", targets: ["Raptor"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/IBM-Swift/BlueSocket.git", from: "1.0.24")
+        .package(url: "https://github.com/IBM-Swift/BlueSocket.git", from: "1.0.200")
     ],
     targets: [.target(name: "Raptor", dependencies: [
         "Socket"
