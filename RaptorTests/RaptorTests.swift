@@ -5,6 +5,31 @@ import Socket
 
 class RaptorTests: XCTestCase {
 
+    // MARK: - 测试辅助方法
+
+    /// 检查测试服务器是否可用
+    private func isTestServerAvailable() -> Bool {
+        do {
+            let raptor = try Raptor(host: "localhost", port: 25575, password: "testpass")
+            _ = try raptor.sendCommand("version")
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// 等待服务器启动（最多等待指定时间）
+    private func waitForServerStartup(timeout: TimeInterval = 60.0) -> Bool {
+        let startTime = Date()
+        while Date().timeIntervalSince(startTime) < timeout {
+            if isTestServerAvailable() {
+                return true
+            }
+            Thread.sleep(forTimeInterval: 2.0)
+        }
+        return false
+    }
+
     // MARK: - sendCommand 方法测试
 
     // 测试 sendCommand 方法的返回类型为 String (packet body)
@@ -59,22 +84,118 @@ class RaptorTests: XCTestCase {
 
     // MARK: - 集成测试
 
-    // 测试完整的命令发送流程（模拟）
-    func testSendCommandIntegration() {
-        // 测试Raptor类能正常实例化和方法调用
-        // 不依赖网络连接的测试
+    // 测试完整的命令发送流程（真实集成测试）
+    func testSendCommandIntegration() throws {
+        // 真实的集成测试，需要运行的 RCON 服务器
+        // 使用项目中的 Docker Compose 配置：docker-compose up -d
 
-        // 验证类可以正常创建（无论连接是否成功）
-        var raptorInstance: Raptor?
-        do {
-            raptorInstance = try Raptor(host: "localhost", port: 25575, password: "testpass")
-        } catch {
-            // 连接失败是正常的，说明类创建逻辑正常工作
-            raptorInstance = nil
+        // 首先检查服务器是否可用，如果不可用则跳过测试
+        guard isTestServerAvailable() else {
+            throw XCTSkip("RCON 测试服务器不可用。请运行 'docker-compose up -d' 启动测试服务器")
         }
 
-        // 无论连接成功还是失败，都说明集成测试通过
-        XCTAssertTrue(true, "集成测试正常执行")
+        let expectation = XCTestExpectation(description: "RCON 命令发送和响应")
+
+        // 配置与 Docker Compose 中定义的服务器连接参数一致
+        let host = "localhost"
+        let port: Int32 = 25575
+        let password = "testpass"
+
+        DispatchQueue.global().async {
+            do {
+                // 创建 Raptor 实例并连接到服务器
+                let raptor = try Raptor(host: host, port: port, password: password)
+
+                // 测试1: 基本命令 - 获取服务器版本
+                let versionResponse = try raptor.sendCommand("version")
+                XCTAssertFalse(versionResponse.isEmpty, "版本命令应该返回非空响应")
+                print("版本响应: \(versionResponse)")
+
+                // 测试2: 列表命令 - 获取在线玩家
+                let listResponse = try raptor.sendCommand("list")
+                XCTAssertFalse(listResponse.isEmpty, "列表命令应该返回非空响应")
+                print("玩家列表响应: \(listResponse)")
+
+                // 测试3: 时间命令 - 获取游戏时间
+                let timeResponse = try raptor.sendCommand("time query daytime")
+                XCTAssertFalse(timeResponse.isEmpty, "时间查询命令应该返回非空响应")
+                XCTAssertTrue(timeResponse.contains("time") || timeResponse.contains("day"),
+                             "时间响应应该包含时间相关信息")
+                print("时间查询响应: \(timeResponse)")
+
+                // 测试4: 种子命令 - 获取世界种子
+                let seedResponse = try raptor.sendCommand("seed")
+                XCTAssertFalse(seedResponse.isEmpty, "种子命令应该返回非空响应")
+                print("种子响应: \(seedResponse)")
+
+                // 测试5: 帮助命令 - 获取可用命令列表
+                let helpResponse = try raptor.sendCommand("help")
+                XCTAssertFalse(helpResponse.isEmpty, "帮助命令应该返回非空响应")
+                print("帮助响应: \(helpResponse)")
+
+                // 测试6: @discardableResult 属性 - 忽略返回值
+                try raptor.sendCommand("whitelist list") // 忽略返回值，不应产生编译警告
+
+                // 测试7: 连续多个命令 - 验证连接稳定性
+                for i in 1...3 {
+                    let response = try raptor.sendCommand("time query gametime")
+                    XCTAssertFalse(response.isEmpty, "第\(i)次连续命令应该成功")
+                }
+
+                expectation.fulfill()
+
+            } catch Raptor.ClientError.connectionFailed {
+                XCTFail("连接失败：请确保 RCON 服务器正在运行。运行命令：docker-compose up -d")
+                expectation.fulfill()
+
+            } catch Raptor.ClientError.invalidResponse {
+                XCTFail("收到无效响应：服务器返回了无法解析的数据")
+                expectation.fulfill()
+
+            } catch Raptor.ClientError.unserializableCommand {
+                XCTFail("命令序列化失败：发送的命令无法正确编码")
+                expectation.fulfill()
+
+            } catch {
+                XCTFail("未预期的错误：\(error)")
+                expectation.fulfill()
+            }
+        }
+
+        // 等待异步操作完成，给足够的时间让服务器响应
+        wait(for: [expectation], timeout: 45.0)
+    }
+
+    // 测试错误处理的集成场景
+    func testSendCommandIntegrationErrorHandling() {
+        let expectation = XCTestExpectation(description: "RCON 错误处理测试")
+
+        DispatchQueue.global().async {
+            // 测试连接失败场景
+            do {
+                let _ = try Raptor(host: "nonexistent.host", port: 25575, password: "wrongpass")
+                XCTFail("应该抛出连接失败错误")
+            } catch Raptor.ClientError.connectionFailed {
+                // 预期的错误
+                XCTAssertTrue(true, "正确处理了连接失败错误")
+            } catch {
+                XCTFail("应该抛出 connectionFailed 错误，但得到：\(error)")
+            }
+
+            // 测试错误密码场景（如果服务器可用）
+            do {
+                let raptor = try Raptor(host: "localhost", port: 25575, password: "wrongpassword")
+                let _ = try raptor.sendCommand("version")
+                XCTFail("使用错误密码应该失败")
+            } catch {
+                // 预期会失败，可能是连接失败或授权失败
+                XCTAssertTrue(true, "正确处理了认证错误")
+            }
+
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 15.0)
     }
 
     // MARK: - Raptor 类结构测试
