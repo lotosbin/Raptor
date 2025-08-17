@@ -1,7 +1,7 @@
 import Foundation
 
 /// RCON 响应包结构
-public struct RCONPacket {
+struct RCONPacket {
     /// 包的大小（字节数）
     public let size: UInt32
     /// 包的ID

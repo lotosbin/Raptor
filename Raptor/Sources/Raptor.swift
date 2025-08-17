@@ -31,10 +31,10 @@ public class Raptor {
         socket.close()
     }
     
-    @discardableResult public func sendCommand(_ command: String) throws -> RCONPacket {
+    @discardableResult public func sendCommand(_ command: String) throws -> String {
         let responseData = try write(.serverCommand, message: command)
         do {
-            return try RCONPacket(from: responseData)
+            return try RCONPacket(from: responseData).body
         } catch let error as RCONError {
             throw ClientError.rconError(error)
         }
