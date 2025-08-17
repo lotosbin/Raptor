@@ -5,6 +5,7 @@ public class Raptor {
     
     enum ClientError: Error {
         case unserializableCommand
+        case rconError(RCONError)
     }
     
     public let host: String
@@ -30,8 +31,13 @@ public class Raptor {
         socket.close()
     }
     
-    @discardableResult public func sendCommand(_ command: String) throws -> Data {
-        return try write(.serverCommand, message: command)
+    @discardableResult public func sendCommand(_ command: String) throws -> RCONPacket {
+        let responseData = try write(.serverCommand, message: command)
+        do {
+            return try RCONPacket(from: responseData)
+        } catch let error as RCONError {
+            throw ClientError.rconError(error)
+        }
     }
     
     @discardableResult private func write(_ type: MessageType, message: String) throws -> Data {
