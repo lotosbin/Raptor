@@ -30,8 +30,8 @@ public class Raptor {
         socket.close()
     }
     
-    public func sendCommand(_ command: String) throws {
-        try write(.serverCommand, message: command)
+    @discardableResult public func sendCommand(_ command: String) throws -> Data {
+        return try write(.serverCommand, message: command)
     }
     
     @discardableResult private func write(_ type: MessageType, message: String) throws -> Data {
