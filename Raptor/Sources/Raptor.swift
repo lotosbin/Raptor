@@ -3,9 +3,10 @@ import Socket
 
 public class Raptor {
     
-    enum ClientError: Error {
+    public enum ClientError: Error {
         case unserializableCommand
-        case rconError(RCONError)
+        case invalidResponse
+        case connectionFailed
     }
     
     public let host: String
@@ -34,9 +35,10 @@ public class Raptor {
     @discardableResult public func sendCommand(_ command: String) throws -> String {
         let responseData = try write(.serverCommand, message: command)
         do {
-            return try RCONPacket(from: responseData).body
-        } catch let error as RCONError {
-            throw ClientError.rconError(error)
+            let packet = try RCONPacket(from: responseData)
+            return packet.body
+        } catch {
+            throw ClientError.invalidResponse
         }
     }
     

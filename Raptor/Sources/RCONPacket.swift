@@ -1,20 +1,20 @@
 import Foundation
 
-/// RCON 响应包结构
+/// RCON 响应包结构（内部实现）
 struct RCONPacket {
     /// 包的大小（字节数）
-    public let size: UInt32
+    let size: UInt32
     /// 包的ID
-    public let id: UInt32
+    let id: UInt32
     /// 包的类型
-    public let type: MessageType
+    let type: MessageType
     /// 响应的body内容
-    public let body: String
+    let body: String
 
     /// 从原始数据解析RCON包
     /// - Parameter data: 从服务器接收的原始数据
     /// - Throws: 解析错误
-    public init(from data: Data) throws {
+    init(from data: Data) throws {
         guard data.count >= 12 else {
             throw RCONError.invalidPacketSize
         }
@@ -33,7 +33,8 @@ struct RCONPacket {
         self.type = messageType
 
         // 解析body（剩余数据，去掉最后的两个null字节）
-        let bodyData = data.subdata(in: 12..<(data.count - 2))
+        let bodyEndIndex = data.count - 2
+        let bodyData = data.subdata(in: 12..<bodyEndIndex)
         guard let bodyString = String(data: bodyData, encoding: .ascii) else {
             throw RCONError.invalidBodyEncoding
         }
@@ -42,7 +43,7 @@ struct RCONPacket {
 }
 
 /// RCON相关错误
-public enum RCONError: Error {
+enum RCONError: Error {
     case invalidPacketSize
     case invalidPacketType
     case invalidBodyEncoding

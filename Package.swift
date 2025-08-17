@@ -1,4 +1,5 @@
 // swift-tools-version:4.0
+
 import PackageDescription
 
 let package = Package(
@@ -9,8 +10,12 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/IBM-Swift/BlueSocket.git", from: "1.0.200")
     ],
-    targets: [.target(name: "Raptor", dependencies: [
-        "Socket"
-    ], path: "Raptor/Sources")],
-    swiftLanguageVersions: [4]
+    targets: [
+        .target(name: "Raptor", dependencies: [
+            "Socket"
+        ], path: "Raptor/Sources"),
+        .testTarget(name: "RaptorTests", dependencies: [
+            "Raptor"
+        ], path: "RaptorTests")
+    ]
 )
